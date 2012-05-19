@@ -10,6 +10,7 @@ from django.db.models.query import QuerySet
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
 from django.core.urlresolvers import reverse
 from django.template import Context
 from django.template.loader import render_to_string
@@ -21,6 +22,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes import generic
+
 
 QUEUE_ALL = getattr(settings, "NOTIFICATION_QUEUE_ALL", False)
 
@@ -317,14 +319,16 @@ def send_now(users, label, extra_context=None, on_site=True, sender=None):
         }, context).splitlines())
         
         body = render_to_string("notification/email_body.txt", {
-            "message": messages["full.txt"],
+            "message": messages["notice.html"],
         }, context)
         
-        notice = Notice.objects.create(recipient=user, message=messages["notice.html"],
+        notice = Notice.objects.create(recipient=user, message=messages["full.txt"],
             notice_type=notice_type, on_site=on_site, sender=sender)
         if should_send(user, notice_type, "1") and user.email and user.is_active: # Email
             recipients.append(user.email)
-        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients)
+        msg = EmailMultiAlternatives(subject, messages["full.txt"], settings.DEFAULT_FROM_EMAIL, recipients)
+        msg.attach_alternative(body, "text/html")
+        msg.send()
     
     # reset environment to original language
     activate(current_language)
